@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -206,7 +207,12 @@ func (x *jsonLex) lexString(yylval *jsonSymType) int {
 	}
 
 	yylval.str = b.String()
-	return STRING
+
+	if isComment(yylval.str) {
+		return COMMENTSTRING
+	} else {
+		return STRING
+	}
 }
 
 // Return the next rune for the lexer.
@@ -253,4 +259,8 @@ func (x *jsonLex) createErr(msg string) {
 // The parser calls this method on a parse error.
 func (x *jsonLex) Error(s string) {
 	x.createErr(s)
+}
+
+func isComment(str string) bool {
+	return strings.HasPrefix(str, "//")
 }

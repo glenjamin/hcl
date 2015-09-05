@@ -38,7 +38,10 @@ const PERIOD = 57360
 const EPLUS = 57361
 const EMINUS = 57362
 
-var hclToknames = []string{
+var hclToknames = [...]string{
+	"$end",
+	"error",
+	"$unk",
 	"BOOL",
 	"FLOAT",
 	"NUMBER",
@@ -57,7 +60,7 @@ var hclToknames = []string{
 	"EPLUS",
 	"EMINUS",
 }
-var hclStatenames = []string{}
+var hclStatenames = [...]string{}
 
 const hclEofCode = 1
 const hclErrCode = 2
@@ -66,7 +69,7 @@ const hclMaxDepth = 200
 //line parse.y:259
 
 //line yacctab:1
-var hclExca = []int{
+var hclExca = [...]int{
 	-1, 1,
 	1, -1,
 	-2, 0,
@@ -86,7 +89,7 @@ var hclStates []string
 
 const hclLast = 62
 
-var hclAct = []int{
+var hclAct = [...]int{
 
 	35, 3, 21, 22, 9, 30, 31, 29, 17, 26,
 	25, 26, 25, 10, 26, 25, 18, 24, 13, 24,
@@ -96,7 +99,7 @@ var hclAct = []int{
 	27, 15, 5, 13, 19, 1, 4, 8, 33, 20,
 	16, 12,
 }
-var hclPact = []int{
+var hclPact = [...]int{
 
 	32, -1000, 32, -1000, 3, -1000, -1000, -1000, 39, -1000,
 	4, -1000, -1000, 23, -1000, -1000, -1000, -1000, -1000, -1000,
@@ -104,26 +107,26 @@ var hclPact = []int{
 	36, 19, -1000, 16, -1000, -1000, -1000, -1000, -1000, -1000,
 	-1000, -1000, -1000, -1000, 34, -1000, -1000,
 }
-var hclPgo = []int{
+var hclPgo = [...]int{
 
 	0, 3, 2, 59, 58, 36, 52, 49, 43, 1,
 	0, 57, 7, 56, 55,
 }
-var hclR1 = []int{
+var hclR1 = [...]int{
 
 	0, 14, 14, 5, 5, 8, 8, 13, 13, 9,
 	9, 9, 9, 9, 9, 6, 6, 11, 11, 3,
 	3, 4, 4, 4, 10, 10, 7, 7, 7, 7,
 	2, 2, 1, 1, 12, 12,
 }
-var hclR2 = []int{
+var hclR2 = [...]int{
 
 	0, 0, 1, 1, 2, 3, 2, 1, 1, 3,
 	3, 3, 3, 3, 1, 2, 2, 1, 1, 3,
 	2, 1, 3, 2, 1, 1, 1, 1, 2, 2,
 	2, 1, 2, 1, 2, 2,
 }
-var hclChk = []int{
+var hclChk = [...]int{
 
 	-1000, -14, -5, -9, -13, -6, 9, 12, -11, -9,
 	10, -8, -6, 14, 9, 12, -7, 4, 12, -8,
@@ -131,7 +134,7 @@ var hclChk = []int{
 	19, 20, -12, -4, 17, -10, -7, 12, -2, -1,
 	15, 6, 6, 17, 7, 8, -10,
 }
-var hclDef = []int{
+var hclDef = [...]int{
 
 	1, -2, 2, 3, 0, 14, -2, -2, 0, 4,
 	0, 15, 16, 0, 17, 18, 9, 10, 11, 12,
@@ -139,37 +142,65 @@ var hclDef = []int{
 	0, 0, 29, 0, 20, 21, 24, 25, 30, 32,
 	5, 34, 35, 19, 0, 23, 22,
 }
-var hclTok1 = []int{
+var hclTok1 = [...]int{
 
 	1,
 }
-var hclTok2 = []int{
+var hclTok2 = [...]int{
 
 	2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
 	12, 13, 14, 15, 16, 17, 18, 19, 20,
 }
-var hclTok3 = []int{
+var hclTok3 = [...]int{
 	0,
 }
+
+var hclErrorMessages = [...]struct {
+	state int
+	token int
+	msg   string
+}{}
 
 //line yaccpar:1
 
 /*	parser for yacc output	*/
 
-var hclDebug = 0
+var (
+	hclDebug        = 0
+	hclErrorVerbose = false
+)
 
 type hclLexer interface {
 	Lex(lval *hclSymType) int
 	Error(s string)
 }
 
+type hclParser interface {
+	Parse(hclLexer) int
+	Lookahead() int
+}
+
+type hclParserImpl struct {
+	lookahead func() int
+}
+
+func (p *hclParserImpl) Lookahead() int {
+	return p.lookahead()
+}
+
+func hclNewParser() hclParser {
+	p := &hclParserImpl{
+		lookahead: func() int { return -1 },
+	}
+	return p
+}
+
 const hclFlag = -1000
 
 func hclTokname(c int) string {
-	// 4 is TOKSTART above
-	if c >= 4 && c-4 < len(hclToknames) {
-		if hclToknames[c-4] != "" {
-			return hclToknames[c-4]
+	if c >= 1 && c-1 < len(hclToknames) {
+		if hclToknames[c-1] != "" {
+			return hclToknames[c-1]
 		}
 	}
 	return __yyfmt__.Sprintf("tok-%v", c)
@@ -184,51 +215,129 @@ func hclStatname(s int) string {
 	return __yyfmt__.Sprintf("state-%v", s)
 }
 
-func hcllex1(lex hclLexer, lval *hclSymType) int {
-	c := 0
-	char := lex.Lex(lval)
+func hclErrorMessage(state, lookAhead int) string {
+	const TOKSTART = 4
+
+	if !hclErrorVerbose {
+		return "syntax error"
+	}
+
+	for _, e := range hclErrorMessages {
+		if e.state == state && e.token == lookAhead {
+			return "syntax error: " + e.msg
+		}
+	}
+
+	res := "syntax error: unexpected " + hclTokname(lookAhead)
+
+	// To match Bison, suggest at most four expected tokens.
+	expected := make([]int, 0, 4)
+
+	// Look for shiftable tokens.
+	base := hclPact[state]
+	for tok := TOKSTART; tok-1 < len(hclToknames); tok++ {
+		if n := base + tok; n >= 0 && n < hclLast && hclChk[hclAct[n]] == tok {
+			if len(expected) == cap(expected) {
+				return res
+			}
+			expected = append(expected, tok)
+		}
+	}
+
+	if hclDef[state] == -2 {
+		i := 0
+		for hclExca[i] != -1 || hclExca[i+1] != state {
+			i += 2
+		}
+
+		// Look for tokens that we accept or reduce.
+		for i += 2; hclExca[i] >= 0; i += 2 {
+			tok := hclExca[i]
+			if tok < TOKSTART || hclExca[i+1] == 0 {
+				continue
+			}
+			if len(expected) == cap(expected) {
+				return res
+			}
+			expected = append(expected, tok)
+		}
+
+		// If the default action is to accept or reduce, give up.
+		if hclExca[i+1] != 0 {
+			return res
+		}
+	}
+
+	for i, tok := range expected {
+		if i == 0 {
+			res += ", expecting "
+		} else {
+			res += " or "
+		}
+		res += hclTokname(tok)
+	}
+	return res
+}
+
+func hcllex1(lex hclLexer, lval *hclSymType) (char, token int) {
+	token = 0
+	char = lex.Lex(lval)
 	if char <= 0 {
-		c = hclTok1[0]
+		token = hclTok1[0]
 		goto out
 	}
 	if char < len(hclTok1) {
-		c = hclTok1[char]
+		token = hclTok1[char]
 		goto out
 	}
 	if char >= hclPrivate {
 		if char < hclPrivate+len(hclTok2) {
-			c = hclTok2[char-hclPrivate]
+			token = hclTok2[char-hclPrivate]
 			goto out
 		}
 	}
 	for i := 0; i < len(hclTok3); i += 2 {
-		c = hclTok3[i+0]
-		if c == char {
-			c = hclTok3[i+1]
+		token = hclTok3[i+0]
+		if token == char {
+			token = hclTok3[i+1]
 			goto out
 		}
 	}
 
 out:
-	if c == 0 {
-		c = hclTok2[1] /* unknown char */
+	if token == 0 {
+		token = hclTok2[1] /* unknown char */
 	}
 	if hclDebug >= 3 {
-		__yyfmt__.Printf("lex %s(%d)\n", hclTokname(c), uint(char))
+		__yyfmt__.Printf("lex %s(%d)\n", hclTokname(token), uint(char))
 	}
-	return c
+	return char, token
 }
 
 func hclParse(hcllex hclLexer) int {
+	return hclNewParser().Parse(hcllex)
+}
+
+func (hclrcvr *hclParserImpl) Parse(hcllex hclLexer) int {
 	var hcln int
 	var hcllval hclSymType
 	var hclVAL hclSymType
+	var hclDollar []hclSymType
+	_ = hclDollar // silence set and not used
 	hclS := make([]hclSymType, hclMaxDepth)
 
 	Nerrs := 0   /* number of errors */
 	Errflag := 0 /* error recovery flag */
 	hclstate := 0
 	hclchar := -1
+	hcltoken := -1 // hclchar translated into internal numbering
+	hclrcvr.lookahead = func() int { return hclchar }
+	defer func() {
+		// Make sure we report no lookahead when not parsing.
+		hclstate = -1
+		hclchar = -1
+		hcltoken = -1
+	}()
 	hclp := -1
 	goto hclstack
 
@@ -241,7 +350,7 @@ ret1:
 hclstack:
 	/* put a state and value onto the stack */
 	if hclDebug >= 4 {
-		__yyfmt__.Printf("char %v in %v\n", hclTokname(hclchar), hclStatname(hclstate))
+		__yyfmt__.Printf("char %v in %v\n", hclTokname(hcltoken), hclStatname(hclstate))
 	}
 
 	hclp++
@@ -259,15 +368,16 @@ hclnewstate:
 		goto hcldefault /* simple state */
 	}
 	if hclchar < 0 {
-		hclchar = hcllex1(hcllex, &hcllval)
+		hclchar, hcltoken = hcllex1(hcllex, &hcllval)
 	}
-	hcln += hclchar
+	hcln += hcltoken
 	if hcln < 0 || hcln >= hclLast {
 		goto hcldefault
 	}
 	hcln = hclAct[hcln]
-	if hclChk[hcln] == hclchar { /* valid shift */
+	if hclChk[hcln] == hcltoken { /* valid shift */
 		hclchar = -1
+		hcltoken = -1
 		hclVAL = hcllval
 		hclstate = hcln
 		if Errflag > 0 {
@@ -281,7 +391,7 @@ hcldefault:
 	hcln = hclDef[hclstate]
 	if hcln == -2 {
 		if hclchar < 0 {
-			hclchar = hcllex1(hcllex, &hcllval)
+			hclchar, hcltoken = hcllex1(hcllex, &hcllval)
 		}
 
 		/* look through exception table */
@@ -294,7 +404,7 @@ hcldefault:
 		}
 		for xi += 2; ; xi += 2 {
 			hcln = hclExca[xi+0]
-			if hcln < 0 || hcln == hclchar {
+			if hcln < 0 || hcln == hcltoken {
 				break
 			}
 		}
@@ -307,11 +417,11 @@ hcldefault:
 		/* error ... attempt to resume parsing */
 		switch Errflag {
 		case 0: /* brand new error */
-			hcllex.Error("syntax error")
+			hcllex.Error(hclErrorMessage(hclstate, hcltoken))
 			Nerrs++
 			if hclDebug >= 1 {
 				__yyfmt__.Printf("%s", hclStatname(hclstate))
-				__yyfmt__.Printf(" saw %s\n", hclTokname(hclchar))
+				__yyfmt__.Printf(" saw %s\n", hclTokname(hcltoken))
 			}
 			fallthrough
 
@@ -339,12 +449,13 @@ hcldefault:
 
 		case 3: /* no shift yet; clobber input char */
 			if hclDebug >= 2 {
-				__yyfmt__.Printf("error recovery discards %s\n", hclTokname(hclchar))
+				__yyfmt__.Printf("error recovery discards %s\n", hclTokname(hcltoken))
 			}
-			if hclchar == hclEofCode {
+			if hcltoken == hclEofCode {
 				goto ret1
 			}
 			hclchar = -1
+			hcltoken = -1
 			goto hclnewstate /* try again in the same state */
 		}
 	}
@@ -359,6 +470,13 @@ hcldefault:
 	_ = hclpt // guard against "declared and not used"
 
 	hclp -= hclR2[hcln]
+	// hclp is now the index of $0. Perform the default action. Iff the
+	// reduced production is ε, $1 is possibly out of range.
+	if hclp+1 >= len(hclS) {
+		nyys := make([]hclSymType, len(hclS)*2)
+		copy(nyys, hclS)
+		hclS = nyys
+	}
 	hclVAL = hclS[hclp+1]
 
 	/* consult goto table to find next state */
@@ -378,37 +496,43 @@ hcldefault:
 	switch hclnt {
 
 	case 1:
+		hclDollar = hclS[hclpt-0 : hclpt+1]
 		//line parse.y:39
 		{
 			hclResult = &Object{Type: ValueTypeObject}
 		}
 	case 2:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:43
 		{
 			hclResult = &Object{
 				Type:  ValueTypeObject,
-				Value: ObjectList(hclS[hclpt-0].objlist).Flat(),
+				Value: ObjectList(hclDollar[1].objlist).Flat(),
 			}
 		}
 	case 3:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:52
 		{
-			hclVAL.objlist = []*Object{hclS[hclpt-0].obj}
+			hclVAL.objlist = []*Object{hclDollar[1].obj}
 		}
 	case 4:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:56
 		{
-			hclVAL.objlist = append(hclS[hclpt-1].objlist, hclS[hclpt-0].obj)
+			hclVAL.objlist = append(hclDollar[1].objlist, hclDollar[2].obj)
 		}
 	case 5:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:62
 		{
 			hclVAL.obj = &Object{
 				Type:  ValueTypeObject,
-				Value: ObjectList(hclS[hclpt-1].objlist).Flat(),
+				Value: ObjectList(hclDollar[2].objlist).Flat(),
 			}
 		}
 	case 6:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:69
 		{
 			hclVAL.obj = &Object{
@@ -416,142 +540,164 @@ hcldefault:
 			}
 		}
 	case 7:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:77
 		{
-			hclVAL.str = hclS[hclpt-0].str
+			hclVAL.str = hclDollar[1].str
 		}
 	case 8:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:81
 		{
-			hclVAL.str = hclS[hclpt-0].str
+			hclVAL.str = hclDollar[1].str
 		}
 	case 9:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:87
 		{
-			hclVAL.obj = hclS[hclpt-0].obj
-			hclVAL.obj.Key = hclS[hclpt-2].str
+			hclVAL.obj = hclDollar[3].obj
+			hclVAL.obj.Key = hclDollar[1].str
 		}
 	case 10:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:92
 		{
 			hclVAL.obj = &Object{
-				Key:   hclS[hclpt-2].str,
+				Key:   hclDollar[1].str,
 				Type:  ValueTypeBool,
-				Value: hclS[hclpt-0].b,
+				Value: hclDollar[3].b,
 			}
 		}
 	case 11:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:100
 		{
 			hclVAL.obj = &Object{
-				Key:   hclS[hclpt-2].str,
+				Key:   hclDollar[1].str,
 				Type:  ValueTypeString,
-				Value: hclS[hclpt-0].str,
+				Value: hclDollar[3].str,
 			}
 		}
 	case 12:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:108
 		{
-			hclS[hclpt-0].obj.Key = hclS[hclpt-2].str
-			hclVAL.obj = hclS[hclpt-0].obj
+			hclDollar[3].obj.Key = hclDollar[1].str
+			hclVAL.obj = hclDollar[3].obj
 		}
 	case 13:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:113
 		{
 			hclVAL.obj = &Object{
-				Key:   hclS[hclpt-2].str,
+				Key:   hclDollar[1].str,
 				Type:  ValueTypeList,
-				Value: hclS[hclpt-0].objlist,
+				Value: hclDollar[3].objlist,
 			}
 		}
 	case 14:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:121
 		{
-			hclVAL.obj = hclS[hclpt-0].obj
+			hclVAL.obj = hclDollar[1].obj
 		}
 	case 15:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:127
 		{
-			hclS[hclpt-0].obj.Key = hclS[hclpt-1].str
-			hclVAL.obj = hclS[hclpt-0].obj
+			hclDollar[2].obj.Key = hclDollar[1].str
+			hclVAL.obj = hclDollar[2].obj
 		}
 	case 16:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:132
 		{
 			hclVAL.obj = &Object{
-				Key:   hclS[hclpt-1].str,
+				Key:   hclDollar[1].str,
 				Type:  ValueTypeObject,
-				Value: []*Object{hclS[hclpt-0].obj},
+				Value: []*Object{hclDollar[2].obj},
 			}
 		}
 	case 17:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:142
 		{
-			hclVAL.str = hclS[hclpt-0].str
+			hclVAL.str = hclDollar[1].str
 		}
 	case 18:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:146
 		{
-			hclVAL.str = hclS[hclpt-0].str
+			hclVAL.str = hclDollar[1].str
 		}
 	case 19:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:152
 		{
-			hclVAL.objlist = hclS[hclpt-1].objlist
+			hclVAL.objlist = hclDollar[2].objlist
 		}
 	case 20:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:156
 		{
 			hclVAL.objlist = nil
 		}
 	case 21:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:162
 		{
-			hclVAL.objlist = []*Object{hclS[hclpt-0].obj}
+			hclVAL.objlist = []*Object{hclDollar[1].obj}
 		}
 	case 22:
+		hclDollar = hclS[hclpt-3 : hclpt+1]
 		//line parse.y:166
 		{
-			hclVAL.objlist = append(hclS[hclpt-2].objlist, hclS[hclpt-0].obj)
+			hclVAL.objlist = append(hclDollar[1].objlist, hclDollar[3].obj)
 		}
 	case 23:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:170
 		{
-			hclVAL.objlist = hclS[hclpt-1].objlist
+			hclVAL.objlist = hclDollar[1].objlist
 		}
 	case 24:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:176
 		{
-			hclVAL.obj = hclS[hclpt-0].obj
+			hclVAL.obj = hclDollar[1].obj
 		}
 	case 25:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:180
 		{
 			hclVAL.obj = &Object{
 				Type:  ValueTypeString,
-				Value: hclS[hclpt-0].str,
+				Value: hclDollar[1].str,
 			}
 		}
 	case 26:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:189
 		{
 			hclVAL.obj = &Object{
 				Type:  ValueTypeInt,
-				Value: hclS[hclpt-0].num,
+				Value: hclDollar[1].num,
 			}
 		}
 	case 27:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:196
 		{
 			hclVAL.obj = &Object{
 				Type:  ValueTypeFloat,
-				Value: hclS[hclpt-0].f,
+				Value: hclDollar[1].f,
 			}
 		}
 	case 28:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:203
 		{
-			fs := fmt.Sprintf("%d%s", hclS[hclpt-1].num, hclS[hclpt-0].str)
+			fs := fmt.Sprintf("%d%s", hclDollar[1].num, hclDollar[2].str)
 			f, err := strconv.ParseFloat(fs, 64)
 			if err != nil {
 				panic(err)
@@ -563,9 +709,10 @@ hcldefault:
 			}
 		}
 	case 29:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:216
 		{
-			fs := fmt.Sprintf("%f%s", hclS[hclpt-1].f, hclS[hclpt-0].str)
+			fs := fmt.Sprintf("%f%s", hclDollar[1].f, hclDollar[2].str)
 			f, err := strconv.ParseFloat(fs, 64)
 			if err != nil {
 				panic(err)
@@ -577,34 +724,40 @@ hcldefault:
 			}
 		}
 	case 30:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:231
 		{
-			hclVAL.num = hclS[hclpt-0].num * -1
+			hclVAL.num = hclDollar[2].num * -1
 		}
 	case 31:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:235
 		{
-			hclVAL.num = hclS[hclpt-0].num
+			hclVAL.num = hclDollar[1].num
 		}
 	case 32:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:241
 		{
-			hclVAL.f = hclS[hclpt-0].f * -1
+			hclVAL.f = hclDollar[2].f * -1
 		}
 	case 33:
+		hclDollar = hclS[hclpt-1 : hclpt+1]
 		//line parse.y:245
 		{
-			hclVAL.f = hclS[hclpt-0].f
+			hclVAL.f = hclDollar[1].f
 		}
 	case 34:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:251
 		{
-			hclVAL.str = "e" + strconv.FormatInt(int64(hclS[hclpt-0].num), 10)
+			hclVAL.str = "e" + strconv.FormatInt(int64(hclDollar[2].num), 10)
 		}
 	case 35:
+		hclDollar = hclS[hclpt-2 : hclpt+1]
 		//line parse.y:255
 		{
-			hclVAL.str = "e-" + strconv.FormatInt(int64(hclS[hclpt-0].num), 10)
+			hclVAL.str = "e-" + strconv.FormatInt(int64(hclDollar[2].num), 10)
 		}
 	}
 	goto hclstack /* stack new state and value */

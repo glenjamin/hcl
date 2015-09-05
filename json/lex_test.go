@@ -46,6 +46,19 @@ func TestLexJson(t *testing.T) {
 				lexEOF,
 			},
 		},
+		{
+			"comments.json",
+			[]int{
+				LEFTBRACE,
+				COMMENTSTRING, COLON, STRING, COMMA,
+				STRING, COLON, LEFTBRACE,
+				COMMENTSTRING, COLON, STRING, COMMA,
+				STRING, COLON, LEFTBRACKET, NUMBER, COMMA, NUMBER, RIGHTBRACKET,
+				RIGHTBRACE,
+				RIGHTBRACE,
+				lexEOF,
+			},
+		},
 	}
 
 	for _, tc := range cases {

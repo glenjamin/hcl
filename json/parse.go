@@ -3,8 +3,8 @@ package json
 import (
 	"sync"
 
-	"github.com/hashicorp/hcl/hcl"
 	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/hcl/hcl"
 )
 
 // jsonErrors are the errors built up from parsing. These should not
@@ -33,8 +33,8 @@ func Parse(v string) (*hcl.Object, error) {
 	var err error
 	if len(jsonErrors) > 0 {
 		err = &multierror.Error{Errors: jsonErrors}
-		jsonResult = nil
+		return nil, err
 	}
 
-	return jsonResult, err
+	return jsonResult, nil
 }

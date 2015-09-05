@@ -22,13 +22,13 @@ import (
 
 %type	<f> float
 %type	<num> int
-%type	<obj> number object pair value
+%type	<obj> number object pair commentpair value
 %type	<objlist> array elements members
 %type	<str> exp
 
 %token  <f> FLOAT
 %token  <num> NUMBER
-%token  <str> COLON COMMA IDENTIFIER EQUAL NEWLINE STRING
+%token  <str> COLON COMMA IDENTIFIER EQUAL NEWLINE STRING COMMENTSTRING
 %token  <str> LEFTBRACE RIGHTBRACE LEFTBRACKET RIGHTBRACKET
 %token  <str> TRUE FALSE NULL MINUS PERIOD EPLUS EMINUS
 
@@ -58,9 +58,17 @@ members:
 	{
 		$$ = []*hcl.Object{$1}
 	}
+|	commentpair
+	{
+		$$ = []*hcl.Object{}
+	}
 |	members COMMA pair
 	{
 		$$ = append($1, $3)
+	}
+|	members COLON commentpair
+	{
+		$$ = $1
 	}
 
 pair:
@@ -70,8 +78,21 @@ pair:
 		$$ = $3
 	}
 
+commentpair:
+	COMMENTSTRING COLON value
+	{
+		$$ = nil
+	}
+
 value:
 	STRING
+	{
+		$$ = &hcl.Object{
+			Type:  hcl.ValueTypeString,
+			Value: $1,
+		}
+	}
+|	COMMENTSTRING
 	{
 		$$ = &hcl.Object{
 			Type:  hcl.ValueTypeString,
